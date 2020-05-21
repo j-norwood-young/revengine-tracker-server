@@ -39,11 +39,11 @@ class AnalyticsCollect {
     async hit(req, res) {
         try {
             // console.log(req);
-            let body = [];
+            let parts = [];
             req.on('data', (chunk) => {
-                body.push(chunk);
+                parts.push(chunk);
             }).on('end', async () => {
-                body = Buffer.concat(body).toString();
+                const body = Buffer.concat(parts).toString();
                 let data = null;
                 try {
                     data = JSON.parse(body);
@@ -69,6 +69,7 @@ class AnalyticsCollect {
                         error: JSON.stringify(err)
                     }))
                     res.end();
+                    throw err;
                 }
                 try {
                     if (!data) throw "No data";
@@ -81,9 +82,9 @@ class AnalyticsCollect {
                     const ua = Bowser.parse(data.user_agent);
                     let utm = {};
                     try {
-                        utm = new utmExtractor(data.query_string).get();
+                        utm = new utmExtractor(data.url).get();
                     } catch(err) {
-                        // All good
+                        throw err;
                     }
                     const esdata = {
                         index,
@@ -101,7 +102,7 @@ class AnalyticsCollect {
                         tags: data.post_tags,
                         sections: data.post_sections,
                         time: new Date(),
-                        url: data.raw_uri,
+                        url: data.url,
                         user_agent: data.user_agent,
                         user_id: data.user_id,
                         utm_medium: utm.utm_medium,
@@ -121,36 +122,12 @@ class AnalyticsCollect {
                             return resolve(data);
                         });
                     });
-                    console.log(sendResult);
                 } catch(err) {
                     console.error(err);
                 }
             });
-            
         } catch (err) {
             console.error(new Date(), err);
-        }
-    }
-}
-
-
-const cache_size = config.cache_size || 1000;
-
-const flush = async () => {
-    if (cache.length >= cache_size) {
-        try {
-            if (config.debug) {
-                console.log("Cache length:", cache.length);
-            }
-            const result = await esBulk({ maxRetries: 5, body: cache });
-            cache = [];
-            if (config.debug) {
-                console.log(`Flushed cache, loop ${loops++}, hits ${hits}, items ${result.items.length}`);
-                console.log(result);
-                console.log(result.items[0]);
-            }
-        } catch (err) {
-            console.error(err);
         }
     }
 }
