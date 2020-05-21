@@ -1,23 +1,23 @@
-require('dotenv').config();
+const config = require("config");
 const http = require('http')
 const kafka = require('kafka-node');
 const Bowser = require("bowser");
 const utmExtractor = require("utm-extractor").Utm;
 
-const port = process.env.PORT || 3012
-const host = process.env.HOST || "127.0.0.1"
-const topic = process.env.KAFKA_TOPIC || "revengine_events";
+const port = config.port || 3012
+const host = config.host || "127.0.0.1"
+const topic = config.kafka_topic || "revengine_events";
 
 const Producer = kafka.Producer;
-const client = new kafka.KafkaClient({ kafkaHost: process.env.KAFKA_SERVER || "localhost:9092" });
+const client = new kafka.KafkaClient({ kafkaHost: config.kafka_server || "localhost:9092" });
 const producer = new Producer(client);
 
 // Ensure we have the topic created
 client.createTopics([
     {
         topic,
-        partitions: process.env.KAFKA_PARTITIONS || 1,
-        replicationFactor: process.env.KAFKA_REPLICATION_FACTOR || 1
+        partitions: config.kafka_partitions || 1,
+        replicationFactor: config.kafka_replication_factor || 1
     }
 ], (err, result) => {
     if (err) {
@@ -109,6 +109,7 @@ class AnalyticsCollect {
                         utm_content: utm.utm_content,
                         utm_source: utm.utm_source,
                         utm_term: utm.utm_term,
+                        browser_id: data.browser_id,
                     }
                     console.log({ esdata });
                     let sendResult = await new Promise((resolve, reject) => {
@@ -133,17 +134,17 @@ class AnalyticsCollect {
 }
 
 
-const cache_size = process.env.CACHE_SIZE || 1000;
+const cache_size = config.cache_size || 1000;
 
 const flush = async () => {
     if (cache.length >= cache_size) {
         try {
-            if (process.env.DEBUG) {
+            if (config.debug) {
                 console.log("Cache length:", cache.length);
             }
             const result = await esBulk({ maxRetries: 5, body: cache });
             cache = [];
-            if (process.env.DEBUG) {
+            if (config.debug) {
                 console.log(`Flushed cache, loop ${loops++}, hits ${hits}, items ${result.items.length}`);
                 console.log(result);
                 console.log(result.items[0]);
